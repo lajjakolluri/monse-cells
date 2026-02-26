@@ -1,5 +1,4 @@
 name: Provision Customer Cell
-
 on:
   workflow_dispatch:
     inputs:
@@ -15,50 +14,50 @@ on:
       tier:
         description: 'Tier'
         default: 'starter'
-
 jobs:
   provision:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
-
       - name: Write OCI private key
         run: |
-          mkdir -p ~/.oci
-          echo "${{ secrets.OCI_PRIVATE_KEY }}" > ~/.oci/github_actions_key.pem
-          chmod 600 ~/.oci/github_actions_key.pem
-
+          echo "${{ secrets.OCI_PRIVATE_KEY }}" > /tmp/oci_key.pem
+          chmod 600 /tmp/oci_key.pem
       - name: Write tfvars
         run: |
-          mkdir -p terraform/cell
-          cat > terraform/cell/terraform.tfvars << TFEOF
-          tenancy_ocid         = "${{ secrets.OCI_TENANCY_OCID }}"
-          user_ocid            = "${{ secrets.OCI_USER_OCID }}"
-          fingerprint          = "${{ secrets.OCI_FINGERPRINT }}"
-          private_key          = "$(cat ~/.oci/github_actions_key.pem)"
-          region               = "${{ secrets.OCI_REGION }}"
-          compartment_ocid     = "${{ secrets.OCI_COMPARTMENT_OCID }}"
-          subnet_id            = "${{ secrets.OCI_SUBNET_ID }}"
-          cell_id              = "${{ github.event.inputs.cell_id }}"
-          customer_email       = "${{ github.event.inputs.customer_email }}"
-          subdomain            = "${{ github.event.inputs.subdomain }}"
+          cat > terraform/cell/terraform.tfvars << 'TFEOF'
+          tenancy_ocid         = "OCI_TENANCY_PLACEHOLDER"
+          user_ocid            = "OCI_USER_PLACEHOLDER"
+          fingerprint          = "OCI_FP_PLACEHOLDER"
+          private_key_path     = "/tmp/oci_key.pem"
+          region               = "OCI_REGION_PLACEHOLDER"
+          compartment_ocid     = "OCI_COMP_PLACEHOLDER"
+          subnet_id            = "OCI_SUBNET_PLACEHOLDER"
+          cell_id              = "CELL_ID_PLACEHOLDER"
+          customer_email       = "EMAIL_PLACEHOLDER"
+          subdomain            = "SUBDOMAIN_PLACEHOLDER"
           base_domain          = "monse.ai"
-          cloudflare_api_token = "${{ secrets.CLOUDFLARE_API_TOKEN }}"
-          cloudflare_zone_id   = "${{ secrets.CLOUDFLARE_ZONE_ID }}"
+          cloudflare_api_token = "CF_TOKEN_PLACEHOLDER"
+          cloudflare_zone_id   = "CF_ZONE_PLACEHOLDER"
           TFEOF
-
+          sed -i "s/OCI_TENANCY_PLACEHOLDER/${{ secrets.OCI_TENANCY_OCID }}/g" terraform/cell/terraform.tfvars
+          sed -i "s/OCI_USER_PLACEHOLDER/${{ secrets.OCI_USER_OCID }}/g" terraform/cell/terraform.tfvars
+          sed -i "s/OCI_FP_PLACEHOLDER/${{ secrets.OCI_FINGERPRINT }}/g" terraform/cell/terraform.tfvars
+          sed -i "s/OCI_REGION_PLACEHOLDER/${{ secrets.OCI_REGION }}/g" terraform/cell/terraform.tfvars
+          sed -i "s/OCI_COMP_PLACEHOLDER/${{ secrets.OCI_COMPARTMENT_OCID }}/g" terraform/cell/terraform.tfvars
+          sed -i "s/OCI_SUBNET_PLACEHOLDER/${{ secrets.OCI_SUBNET_ID }}/g" terraform/cell/terraform.tfvars
+          sed -i "s/CELL_ID_PLACEHOLDER/${{ github.event.inputs.cell_id }}/g" terraform/cell/terraform.tfvars
+          sed -i "s/EMAIL_PLACEHOLDER/${{ github.event.inputs.customer_email }}/g" terraform/cell/terraform.tfvars
+          sed -i "s/SUBDOMAIN_PLACEHOLDER/${{ github.event.inputs.subdomain }}/g" terraform/cell/terraform.tfvars
       - name: Terraform Init
         working-directory: terraform/cell
         run: terraform init
-
       - name: Terraform Apply
         working-directory: terraform/cell
         run: terraform apply -auto-approve
-
       - name: Get cell IP and notify
         working-directory: terraform/cell
         run: |
