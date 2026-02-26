@@ -1,0 +1,13 @@
+variable "tenancy_ocid"     { type = string }
+variable "user_ocid"        { type = string }
+variable "fingerprint"      { type = string }
+variable "private_key"      { type = string }
+variable "region"           { type = string }
+variable "compartment_ocid" { type = string }
+variable "subnet_id"        { type = string }
+variable "cell_id"          { type = string }
+variable "customer_email"   { type = string }
+variable "subdomain"        { type = string }
+variable "base_domain"      { type = string }
+variable "cloudflare_api_token" { type = string }
+variable "cloudflare_zone_id"   { type = string }

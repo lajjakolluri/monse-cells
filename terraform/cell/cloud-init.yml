@@ -1,0 +1,45 @@
+#cloud-config
+package_update: true
+packages:
+  - docker
+  - git
+  - curl
+
+runcmd:
+  - systemctl enable --now docker
+  - mkdir -p /opt/site
+  - |
+    cat > /opt/site/docker-compose.yml << 'EOF'
+    version: '3.9'
+    services:
+      wordpress:
+        image: wordpress:latest
+        restart: always
+        ports:
+          - "80:80"
+        environment:
+          WORDPRESS_DB_HOST: db
+          WORDPRESS_DB_USER: wpuser
+          WORDPRESS_DB_PASSWORD: wppass123
+          WORDPRESS_DB_NAME: wpdb
+        volumes:
+          - wp_data:/var/www/html
+      db:
+        image: mysql:8.0
+        restart: always
+        environment:
+          MYSQL_DATABASE: wpdb
+          MYSQL_USER: wpuser
+          MYSQL_PASSWORD: wppass123
+          MYSQL_ROOT_PASSWORD: rootpass123
+        volumes:
+          - db_data:/var/lib/mysql
+    volumes:
+      wp_data:
+      db_data:
+    EOF
+  - cd /opt/site && docker-compose up -d
+  - firewall-cmd --zone=public --add-port=80/tcp --permanent
+  - firewall-cmd --zone=public --add-port=443/tcp --permanent
+  - firewall-cmd --reload
+  - echo "${subdomain}.${base_domain} setup complete for ${customer_email}" > /var/log/monse-cell.log

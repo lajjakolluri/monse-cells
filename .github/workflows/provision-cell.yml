@@ -1,4 +1,5 @@
 name: Provision Customer Cell
+
 on:
   workflow_dispatch:
     inputs:
@@ -14,19 +15,55 @@ on:
       tier:
         description: 'Tier'
         default: 'starter'
+
 jobs:
   provision:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Provision cell
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Write OCI private key
         run: |
-          echo "Provisioning ${{ github.event.inputs.cell_id }}"
-          echo "Customer: ${{ github.event.inputs.customer_email }}"
-          echo "Domain: ${{ github.event.inputs.subdomain }}.monse.ai"
-      - name: Notify orchestrator
+          mkdir -p ~/.oci
+          echo "${{ secrets.OCI_PRIVATE_KEY }}" > ~/.oci/github_actions_key.pem
+          chmod 600 ~/.oci/github_actions_key.pem
+
+      - name: Write tfvars
         run: |
+          mkdir -p terraform/cell
+          cat > terraform/cell/terraform.tfvars << TFEOF
+          tenancy_ocid         = "${{ secrets.OCI_TENANCY_OCID }}"
+          user_ocid            = "${{ secrets.OCI_USER_OCID }}"
+          fingerprint          = "${{ secrets.OCI_FINGERPRINT }}"
+          private_key          = "$(cat ~/.oci/github_actions_key.pem)"
+          region               = "${{ secrets.OCI_REGION }}"
+          compartment_ocid     = "${{ secrets.OCI_COMPARTMENT_OCID }}"
+          subnet_id            = "${{ secrets.OCI_SUBNET_ID }}"
+          cell_id              = "${{ github.event.inputs.cell_id }}"
+          customer_email       = "${{ github.event.inputs.customer_email }}"
+          subdomain            = "${{ github.event.inputs.subdomain }}"
+          base_domain          = "monse.ai"
+          cloudflare_api_token = "${{ secrets.CLOUDFLARE_API_TOKEN }}"
+          cloudflare_zone_id   = "${{ secrets.CLOUDFLARE_ZONE_ID }}"
+          TFEOF
+
+      - name: Terraform Init
+        working-directory: terraform/cell
+        run: terraform init
+
+      - name: Terraform Apply
+        working-directory: terraform/cell
+        run: terraform apply -auto-approve
+
+      - name: Get cell IP and notify
+        working-directory: terraform/cell
+        run: |
+          IP=$(terraform output -raw vm_public_ip)
+          echo "Cell IP: $IP"
           curl -s -X POST ${{ secrets.ORCHESTRATOR_URL }}/cell-ready \
             -H "Content-Type: application/json" \
-            -d '{"cell_id":"${{ github.event.inputs.cell_id }}","domain":"${{ github.event.inputs.subdomain }}.monse.ai","status":"live"}'
+            -d "{\"cell_id\":\"${{ github.event.inputs.cell_id }}\",\"ip\":\"$IP\",\"domain\":\"${{ github.event.inputs.subdomain }}.monse.ai\",\"status\":\"live\"}"
