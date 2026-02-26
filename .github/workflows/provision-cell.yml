@@ -1,0 +1,32 @@
+name: Provision Customer Cell
+on:
+  workflow_dispatch:
+    inputs:
+      cell_id:
+        description: 'Cell ID'
+        required: true
+      customer_email:
+        description: 'Customer email'
+        required: true
+      subdomain:
+        description: 'Subdomain'
+        required: true
+      tier:
+        description: 'Tier'
+        default: 'starter'
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Provision cell
+        run: |
+          echo "Provisioning ${{ github.event.inputs.cell_id }}"
+          echo "Customer: ${{ github.event.inputs.customer_email }}"
+          echo "Domain: ${{ github.event.inputs.subdomain }}.monse.ai"
+      - name: Notify orchestrator
+        run: |
+          curl -s -X POST ${{ secrets.ORCHESTRATOR_URL }}/cell-ready \
+            -H "Content-Type: application/json" \
+            -d '{"cell_id":"${{ github.event.inputs.cell_id }}","domain":"${{ github.event.inputs.subdomain }}.monse.ai","status":"live"}'
